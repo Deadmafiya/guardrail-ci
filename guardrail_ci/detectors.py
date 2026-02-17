@@ -45,9 +45,18 @@ def _is_excluded(path: Path, root: Path, exclude_patterns: list[str] | None) -> 
     return False
 
 
-def discover_files(root: Path, exclude_patterns: list[str] | None = None) -> Iterable[Path]:
+def discover_files(
+    root: Path,
+    exclude_patterns: list[str] | None = None,
+    include_files: set[str] | None = None,
+) -> Iterable[Path]:
+    allow = {p.replace("\\", "/") for p in include_files} if include_files is not None else None
+
     for path in root.rglob("*"):
         if not path.is_file():
+            continue
+        rel = path.relative_to(root).as_posix()
+        if allow is not None and rel not in allow:
             continue
         if _is_excluded(path, root, exclude_patterns):
             continue
@@ -55,9 +64,13 @@ def discover_files(root: Path, exclude_patterns: list[str] | None = None) -> Ite
             yield path
 
 
-def scan_secrets(root: Path, exclude_patterns: list[str] | None = None) -> list[Finding]:
+def scan_secrets(
+    root: Path,
+    exclude_patterns: list[str] | None = None,
+    include_files: set[str] | None = None,
+) -> list[Finding]:
     findings: list[Finding] = []
-    for path in discover_files(root, exclude_patterns):
+    for path in discover_files(root, exclude_patterns, include_files=include_files):
         try:
             lines = path.read_text(errors="ignore").splitlines()
         except Exception:
@@ -81,9 +94,13 @@ def scan_secrets(root: Path, exclude_patterns: list[str] | None = None) -> list[
     return findings
 
 
-def scan_iac(root: Path, exclude_patterns: list[str] | None = None) -> list[Finding]:
+def scan_iac(
+    root: Path,
+    exclude_patterns: list[str] | None = None,
+    include_files: set[str] | None = None,
+) -> list[Finding]:
     findings: list[Finding] = []
-    for path in discover_files(root, exclude_patterns):
+    for path in discover_files(root, exclude_patterns, include_files=include_files):
         suffix = path.suffix.lower()
 
         if suffix == ".tf":
@@ -166,9 +183,13 @@ def scan_dependencies(root: Path, exclude_patterns: list[str] | None = None) -> 
     return findings
 
 
-def run_all_detectors(root: Path, exclude_patterns: list[str] | None = None) -> list[Finding]:
+def run_all_detectors(
+    root: Path,
+    exclude_patterns: list[str] | None = None,
+    include_files: set[str] | None = None,
+) -> list[Finding]:
     findings: list[Finding] = []
-    findings.extend(scan_secrets(root, exclude_patterns=exclude_patterns))
-    findings.extend(scan_iac(root, exclude_patterns=exclude_patterns))
+    findings.extend(scan_secrets(root, exclude_patterns=exclude_patterns, include_files=include_files))
+    findings.extend(scan_iac(root, exclude_patterns=exclude_patterns, include_files=include_files))
     findings.extend(scan_dependencies(root, exclude_patterns=exclude_patterns))
     return sort_findings(findings)

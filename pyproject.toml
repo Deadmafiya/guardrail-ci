@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "guardrail-ci"
-version = "0.2.0"
+version = "0.3.0"
 description = "Secure-by-design CI guardrail with policy gating and optional AI triage"
 readme = "README.md"
 requires-python = ">=3.10"

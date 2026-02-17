@@ -34,3 +34,11 @@ def test_exclude_paths_can_skip_fixture_findings():
     root = Path("tests/fixtures/vulnerable_repo")
     findings = run_all_detectors(root, exclude_patterns=["**"])
     assert findings == []
+
+
+def test_include_files_scopes_content_detectors():
+    root = Path("tests/fixtures/vulnerable_repo")
+    findings = run_all_detectors(root, include_files={"security.tf"})
+    ids = {f.id for f in findings}
+    assert "GR-IAC-001" in ids
+    assert "GR-SEC-001" not in ids

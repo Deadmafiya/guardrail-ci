@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from guardrail_ci import __version__
 from guardrail_ci.models import ScanReport
 
 
@@ -22,13 +23,19 @@ def write_json_report(report: ScanReport, path: Path) -> None:
 
 def build_markdown_report(report: ScanReport, policy_passed: bool, reasons: list[str]) -> str:
     s = report.summary()
+    eff = report.effective_summary()
     lines = [
         "# guardrail-ci scan report",
         "",
         f"- **Scanned Path:** `{report.scanned_path}`",
         f"- **Policy Result:** {'PASS ✅' if policy_passed else 'FAIL ❌'}",
+        f"- **Files Scanned:** {report.files_scanned}",
+        f"- **Files in Diff Scope:** {report.files_in_diff_scope if report.files_in_diff_scope is not None else 'n/a'}",
         f"- **Total Findings:** {s['total']}",
+        f"- **Effective Findings (unsuppressed):** {eff['total']}",
+        f"- **Suppressed/Expired Suppressions:** {report.suppressed_total}/{report.expired_suppressions_total}",
         f"- **Critical/High/Medium/Low:** {s['critical']}/{s['high']}/{s['medium']}/{s['low']}",
+        f"- **Effective Critical/High/Medium/Low:** {eff['critical']}/{eff['high']}/{eff['medium']}/{eff['low']}",
         "",
     ]
 
@@ -48,6 +55,12 @@ def build_markdown_report(report: ScanReport, policy_passed: bool, reasons: list
         lines.append("No findings. 🎉")
     else:
         for finding in report.findings:
+            sup = ""
+            if finding.suppression_status != "none":
+                sup = (
+                    f"\n- Suppression: **{finding.suppression_status.upper()}**"
+                    f" ({finding.suppression_reason or 'n/a'}, expires {finding.suppression_expires_at or 'n/a'})"
+                )
             lines.extend(
                 [
                     f"### [{finding.id}] {finding.title}",
@@ -56,7 +69,7 @@ def build_markdown_report(report: ScanReport, policy_passed: bool, reasons: list
                     f"- Location: `{finding.file}`{':' + str(finding.line) if finding.line else ''}",
                     f"- Why it matters: {finding.message}",
                     f"- Remediation: {finding.remediation}",
-                    f"- Evidence: `{finding.evidence}`",
+                    f"- Evidence: `{finding.evidence}`{sup}",
                     "",
                 ]
             )
@@ -91,7 +104,15 @@ def build_sarif_report(report: ScanReport) -> dict[str, Any]:
             "ruleId": f.id,
             "level": SARIF_LEVEL_MAP.get(f.severity, "warning"),
             "message": {"text": f.message},
-            "properties": {"severity": f.severity, "category": f.category},
+            "properties": {
+                "severity": f.severity,
+                "category": f.category,
+                "suppressed": f.suppressed,
+                "suppression_status": f.suppression_status,
+                "suppression_reason": f.suppression_reason,
+                "suppression_expires_at": f.suppression_expires_at,
+                "fingerprint": f.fingerprint,
+            },
             "locations": [
                 {
                     "physicalLocation": {
@@ -111,7 +132,7 @@ def build_sarif_report(report: ScanReport) -> dict[str, Any]:
                 "tool": {
                     "driver": {
                         "name": "guardrail-ci",
-                        "version": "0.2.0",
+                        "version": __version__,
                         "rules": _sarif_rule_map(report),
                     }
                 },

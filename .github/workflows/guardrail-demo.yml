@@ -5,11 +5,17 @@ on:
   push:
     branches: [ main ]
 
+permissions:
+  contents: read
+  security-events: write
+
 jobs:
   scan:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -24,9 +30,16 @@ jobs:
           guardrail-ci scan \
             --path . \
             --policy examples/guardrail.yml \
+            --diff-base origin/main \
+            --baseline .guardrail-baseline.yml \
             --json-out guardrail-report.json \
             --md-out guardrail-report.md \
             --sarif-out guardrail-report.sarif
+      - name: Upload SARIF to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: guardrail-report.sarif
       - name: Upload reports
         if: always()
         uses: actions/upload-artifact@v4

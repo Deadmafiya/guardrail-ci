@@ -1,24 +1,18 @@
 # guardrail-ci
 
-Secure-by-Design CI guardrail for modern repositories. `guardrail-ci` scans code/IaC/dependency posture, applies policy gates, and can optionally use an **OpenAI-compatible model** to improve severity triage.
+Secure-by-Design CI guardrail for modern repositories. `guardrail-ci` scans code/IaC/dependency posture, applies policy gates, supports baseline suppressions with expiry, and can optionally use an **OpenAI-compatible model** to improve triage.
 
-## What it does
+## What it does (v0.3)
 - CLI scanner (`guardrail-ci scan`)
 - Detector categories:
-  - ✅ Secrets (implemented)
-  - ✅ IaC misconfiguration checks (implemented)
+  - ✅ Secrets
+  - ✅ IaC misconfiguration checks
   - ✅ Dependency posture checks (lockfile hygiene)
+- ✅ Baseline suppression lifecycle (reason + expiry)
+- ✅ PR-focused diff scanning (`--diff-base`)
+- ✅ Reports: JSON + Markdown + SARIF
+- ✅ GitHub Security upload-ready workflow
 - Optional AI triage (OpenAI-compatible endpoint)
-- Policy gating (CI-friendly exit codes)
-- Reports: JSON + Markdown + SARIF
-- GitHub Actions integration example
-
-## Requirements
-- Python 3.10+
-- pip
-
-Optional for AI mode:
-- OpenAI-compatible API endpoint + key + model
 
 ## Installation
 ```bash
@@ -43,77 +37,75 @@ guardrail-ci scan \
   --sarif-out guardrail-report.sarif
 ```
 
-## AI mode (OpenAI-compatible)
-1. Copy env template:
+## Baseline suppressions (expiry + reason)
+Create baseline from current findings:
 ```bash
-cp .env.example .env
-```
-2. Fill:
-- `OPENAI_BASE_URL`
-- `OPENAI_API_KEY`
-- `OPENAI_MODEL`
-
-3. Run with AI mode:
-```bash
-guardrail-ci scan --path . --policy examples/guardrail.yml --ai-mode auto
+guardrail-ci scan --path . --write-baseline
 ```
 
-Modes:
-- `auto` (default): use AI if configured, otherwise fallback to rules
-- `on`: try AI; fallback still preserved for reliability
-- `off`: rules-only mode
+Use baseline in normal scans:
+```bash
+guardrail-ci scan --path . --baseline .guardrail-baseline.yml
+```
+
+Strict expiry mode (fail when expired suppressions exist):
+```bash
+guardrail-ci scan --path . --baseline .guardrail-baseline.yml --baseline-strict-expiry
+```
+
+Example baseline format:
+```yaml
+version: 1
+suppressions:
+  - id: GR-SEC-003
+    file: src/config.py
+    line: 42
+    fingerprint: 7b2a8f0d...
+    reason: Legacy token pending migration
+    expires_at: "2026-04-01"
+    created_by: "@deadmafia"
+    created_at: "2026-02-17"
+```
+
+## PR changed-files mode
+Limit scanning to files changed from a base ref:
+```bash
+guardrail-ci scan --path . --policy examples/guardrail.yml --diff-base origin/main
+```
+
+Notes:
+- Content detectors (secrets/IaC) are diff-scoped.
+- Dependency posture checks remain repo-level by design.
+- Ensure CI fetches enough git history (`fetch-depth: 0`).
+
+## GitHub Security (SARIF upload)
+Workflow example in `.github/workflows/guardrail-demo.yml` includes:
+- `permissions.security-events: write`
+- SARIF generation
+- `github/codeql-action/upload-sarif@v3`
+
+Minimal upload snippet:
+```yaml
+permissions:
+  contents: read
+  security-events: write
+
+- name: Run guardrail scan
+  run: guardrail-ci scan --path . --policy examples/guardrail.yml --sarif-out guardrail-report.sarif
+
+- name: Upload SARIF
+  if: always()
+  uses: github/codeql-action/upload-sarif@v3
+  with:
+    sarif_file: guardrail-report.sarif
+```
 
 ## Exit codes
 - `0` = policy passed
 - `1` = policy failed
-- `2` = invalid input/path
-
-## Example policy config
-See `examples/guardrail.yml`:
-```yaml
-fail_on:
-  critical: 1
-  high: 2
-  medium: 5
-  low: 9999
-exclude_paths:
-  - tests/fixtures/**
-```
-
-## Implemented checks (v0.2)
-
-### Secrets
-- `GR-SEC-001`: AWS Access Key pattern (`AKIA...`)
-- `GR-SEC-002`: Private key block
-- `GR-SEC-003`: Generic hardcoded token/api-key assignment
-
-### IaC
-- `GR-IAC-001`: Terraform admin ports exposed to `0.0.0.0/0`
-- `GR-IAC-002`: `privileged: true` in YAML manifests
-
-### Dependency posture
-- `GR-DEP-001`: JavaScript manifest without lockfile
-- `GR-DEP-002`: Python manifest without lockfile
-
-## GitHub Actions usage
-Workflow example: `.github/workflows/guardrail-demo.yml`
-
-Minimal snippet:
-```yaml
-- uses: actions/checkout@v4
-- uses: actions/setup-python@v5
-  with:
-    python-version: '3.11'
-- run: pip install .
-- run: guardrail-ci scan --path . --policy examples/guardrail.yml --sarif-out guardrail-report.sarif
-```
+- `2` = invalid input/config/git-diff error
 
 ## Run tests
 ```bash
 pytest -q
 ```
-
-## Notes / limitations
-- This is a fast heuristic guardrail, not a full SAST platform.
-- AI triage is advisory/re-ranking logic; core deterministic checks remain the base.
-- Dependency scanning is posture-focused in v0.2 (full CVE DB integration next).
