@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "guardrail-ci"
+version = "0.1.0"
+description = "Secure-by-design CI guardrail with policy gating"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{name = "DeadMafia"}]
+dependencies = [
+  "typer>=0.12.0",
+  "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+]
+
+[project.scripts]
+guardrail-ci = "guardrail_ci.cli:app"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.setuptools]
+packages = ["guardrail_ci"]

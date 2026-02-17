@@ -1,0 +1,7 @@
+__pycache__/
+.pytest_cache/
+*.pyc
+.venv/
+*.egg-info/
+guardrail-report.json
+guardrail-report.md

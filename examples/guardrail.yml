@@ -1,0 +1,5 @@
+fail_on:
+  critical: 1
+  high: 2
+  medium: 5
+  low: 9999
