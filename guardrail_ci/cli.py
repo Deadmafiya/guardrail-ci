@@ -36,7 +36,9 @@ def scan(
         typer.secho(f"Path does not exist: {root}", fg=typer.colors.RED)
         raise typer.Exit(code=2)
 
-    # Load .env from scanned repository root if present
+    # Load .env from current working directory first, then scanned root
+    # (helps when scanning nested paths such as fixtures/subdirs).
+    load_env_file(Path.cwd() / ".env")
     load_env_file(root / ".env")
 
     cfg = load_policy(policy)
