@@ -2,8 +2,18 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 from guardrail_ci.models import ScanReport
+
+
+SARIF_LEVEL_MAP = {
+    "critical": "error",
+    "high": "error",
+    "medium": "warning",
+    "low": "note",
+    "info": "note",
+}
 
 
 def write_json_report(report: ScanReport, path: Path) -> None:
@@ -21,6 +31,12 @@ def build_markdown_report(report: ScanReport, policy_passed: bool, reasons: list
         f"- **Critical/High/Medium/Low:** {s['critical']}/{s['high']}/{s['medium']}/{s['low']}",
         "",
     ]
+
+    if report.ai:
+        lines.extend(["## AI triage", ""])
+        for k, v in report.ai.items():
+            lines.append(f"- **{k}**: `{v}`")
+        lines.append("")
 
     if reasons:
         lines.extend(["## Policy failure reasons", ""])
@@ -50,3 +66,60 @@ def build_markdown_report(report: ScanReport, policy_passed: bool, reasons: list
 
 def write_markdown_report(report: ScanReport, path: Path, policy_passed: bool, reasons: list[str]) -> None:
     path.write_text(build_markdown_report(report, policy_passed, reasons))
+
+
+def _sarif_rule_map(report: ScanReport) -> list[dict[str, Any]]:
+    rules: dict[str, dict[str, Any]] = {}
+    for f in report.findings:
+        if f.id in rules:
+            continue
+        rules[f.id] = {
+            "id": f.id,
+            "name": f.title,
+            "shortDescription": {"text": f.title},
+            "fullDescription": {"text": f.message},
+            "help": {"text": f.remediation},
+            "properties": {"category": f.category},
+        }
+    return list(rules.values())
+
+
+def build_sarif_report(report: ScanReport) -> dict[str, Any]:
+    results = []
+    for f in report.findings:
+        result: dict[str, Any] = {
+            "ruleId": f.id,
+            "level": SARIF_LEVEL_MAP.get(f.severity, "warning"),
+            "message": {"text": f.message},
+            "properties": {"severity": f.severity, "category": f.category},
+            "locations": [
+                {
+                    "physicalLocation": {
+                        "artifactLocation": {"uri": f.file},
+                        "region": {"startLine": f.line or 1},
+                    }
+                }
+            ],
+        }
+        results.append(result)
+
+    return {
+        "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+        "version": "2.1.0",
+        "runs": [
+            {
+                "tool": {
+                    "driver": {
+                        "name": "guardrail-ci",
+                        "version": "0.2.0",
+                        "rules": _sarif_rule_map(report),
+                    }
+                },
+                "results": results,
+            }
+        ],
+    }
+
+
+def write_sarif_report(report: ScanReport, path: Path) -> None:
+    path.write_text(json.dumps(build_sarif_report(report), indent=2))

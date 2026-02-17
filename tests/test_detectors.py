@@ -28,3 +28,9 @@ def test_clean_fixture_has_no_findings_for_mvp_rules():
     root = Path("tests/fixtures/clean_repo")
     findings = run_all_detectors(root)
     assert findings == []
+
+
+def test_exclude_paths_can_skip_fixture_findings():
+    root = Path("tests/fixtures/vulnerable_repo")
+    findings = run_all_detectors(root, exclude_patterns=["**"])
+    assert findings == []

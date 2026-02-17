@@ -29,6 +29,7 @@ class Finding:
 class ScanReport:
     scanned_path: str
     findings: list[Finding]
+    ai: dict[str, Any] | None = None
 
     def summary(self) -> dict[str, int]:
         counts = {k: 0 for k in SEVERITY_ORDER.keys()}
@@ -38,9 +39,25 @@ class ScanReport:
         return counts
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        out = {
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "scanned_path": str(Path(self.scanned_path).resolve()),
             "summary": self.summary(),
             "findings": [f.to_dict() for f in self.findings],
         }
+        if self.ai is not None:
+            out["ai"] = self.ai
+        return out
+
+
+def sort_findings(findings: list[Finding]) -> list[Finding]:
+    return sorted(
+        findings,
+        key=lambda f: (
+            -SEVERITY_ORDER.get(f.severity, 0),
+            f.category,
+            f.file,
+            f.line or 0,
+            f.id,
+        ),
+    )

@@ -5,3 +5,5 @@ __pycache__/
 *.egg-info/
 guardrail-report.json
 guardrail-report.md
+guardrail-report.sarif
+.env

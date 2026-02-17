@@ -18,12 +18,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install .
       - name: Run guardrail scan
+        env:
+          GUARDRAIL_AI_MODE: off
         run: |
           guardrail-ci scan \
             --path . \
             --policy examples/guardrail.yml \
             --json-out guardrail-report.json \
-            --md-out guardrail-report.md
+            --md-out guardrail-report.md \
+            --sarif-out guardrail-report.sarif
       - name: Upload reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -32,3 +35,4 @@ jobs:
           path: |
             guardrail-report.json
             guardrail-report.md
+            guardrail-report.sarif

@@ -3,3 +3,9 @@ fail_on:
   high: 2
   medium: 5
   low: 9999
+
+# Reduce noise in CI for fixtures and local env directories
+exclude_paths:
+  - tests/fixtures/**
+  - .venv/**
+  - guardrail_ci.egg-info/**

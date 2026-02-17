@@ -4,14 +4,15 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "guardrail-ci"
-version = "0.1.0"
-description = "Secure-by-design CI guardrail with policy gating"
+version = "0.2.0"
+description = "Secure-by-design CI guardrail with policy gating and optional AI triage"
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [{name = "DeadMafia"}]
 dependencies = [
   "typer>=0.12.0",
   "pyyaml>=6.0",
+  "requests>=2.31.0",
 ]
 
 [project.optional-dependencies]
